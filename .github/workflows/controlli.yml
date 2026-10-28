@@ -1,0 +1,38 @@
+name: Controlli
+
+# Ogni mattina: scadenza dei token, e per ogni post programmato il campo «Controllo» in Notion (tutto pronto o cosa manca,
+# guardando anche nella cartella Drive), con un commento sulla riga quando compare un problema. Se trova qualcosa il lavoro
+# fallisce e GitHub manda anche l'email di riserva.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controlli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATA_SOURCE_ID: ${{ secrets.NOTION_DATA_SOURCE_ID }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_IG_USER_ID: ${{ secrets.META_IG_USER_ID }}
+          META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+          LINKEDIN_TOKEN_SCADE: ${{ secrets.LINKEDIN_TOKEN_SCADE }}
+          GOOGLE_SA_KEY_B64: ${{ secrets.GOOGLE_SA_KEY_B64 }}
+          NOTION_UTENTE_ID: ${{ secrets.NOTION_UTENTE_ID }}
+          FUSO_ORARIO: ${{ secrets.FUSO_ORARIO }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Scadenza dei token
+        run: python3 avvisi.py
+      - name: Post programmati (campo Controllo e commenti in Notion)
+        if: always()
+        run: python3 controlla.py

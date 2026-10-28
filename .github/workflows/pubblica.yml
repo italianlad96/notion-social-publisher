@@ -1,0 +1,63 @@
+name: Pubblica
+
+# Ai minuti 07, 27 e 47 dalle 6 alle 19 (ora italiana; 5-18 UTC). Il cron di GitHub da solo non è puntuale (può saltare giri
+# interi): l'orario vero lo dà cron-job.org, che chiama il workflow_dispatch qui sotto (vedi README, passo 6); il cron resta come riserva.
+# Repository privato: 2.000 minuti gratuiti al mese, il lavoro ne usa circa 1.300-1.500.
+# Pubblica solo le righe con Stato «Programmato» (o con la spunta «Pubblica subito»). Ciò che aveva la data nelle ultime
+# 48 ore esce al giro dopo; più vecchio va «Da sistemare» con un commento sulla riga.
+on:
+  schedule:
+    - cron: "7,27,47 5-18 * * *"
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "Id della pagina Notion da pubblicare ora (vuoto = tutte quelle pronte)"
+        required: false
+        default: ""
+      prova:
+        description: "Prova: niente diventa pubblico e niente si scrive in Notion"
+        type: boolean
+        default: false
+      ora:
+        description: "Solo con «prova»: finge un'altra ora, per esempio 2026-10-30T09:20:00+01:00"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Un solo giro alla volta: due giri insieme potrebbero pubblicare due volte.
+concurrency:
+  group: pubblica
+  cancel-in-progress: false
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Pubblica ciò che è programmato
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATA_SOURCE_ID: ${{ secrets.NOTION_DATA_SOURCE_ID }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_IG_USER_ID: ${{ secrets.META_IG_USER_ID }}
+          META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+          LINKEDIN_TOKEN_SCADE: ${{ secrets.LINKEDIN_TOKEN_SCADE }}
+          GOOGLE_SA_KEY_B64: ${{ secrets.GOOGLE_SA_KEY_B64 }}
+          NOTION_UTENTE_ID: ${{ secrets.NOTION_UTENTE_ID }}
+          FUSO_ORARIO: ${{ secrets.FUSO_ORARIO }}
+          ID: ${{ inputs.id }}
+          PROVA: ${{ inputs.prova }}
+          ORA: ${{ inputs.ora }}
+        run: |
+          args=(--esegui)
+          if [ "$PROVA" = "true" ]; then args+=(--prova); fi
+          if [ -n "$ID" ]; then args+=(--id "$ID"); fi
+          if [ "$PROVA" = "true" ] && [ -n "$ORA" ]; then args+=(--ora "$ORA"); fi
+          python3 pubblica.py "${args[@]}"
