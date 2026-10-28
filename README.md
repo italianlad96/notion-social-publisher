@@ -52,22 +52,22 @@ Alla proprietà Stato puoi aggiungere altre opzioni (per esempio `Idea`): il sis
 
 ### 2. L'integrazione Notion
 
-1. Su [notion.so/profile/integrations](https://www.notion.so/profile/integrations) crea un'integrazione **interna** per il tuo spazio di lavoro. Nelle capacità: *Leggi contenuti*, *Aggiorna contenuti*, *Inserisci commenti* e, se vuoi essere menzionato nei commenti, *Leggi le informazioni dell'utente, esclusi gli indirizzi email*. Copia il token (comincia con `ntn_`) in `NOTION_TOKEN`.
-2. Apri la tabella Contenuti in Notion, menu `…` in alto a destra, **Connessioni**, aggiungi l'integrazione.
-3. Prendi l'**id del data source**, che non è l'id della tabella. L'id della tabella è la sequenza di 32 caratteri nel link della tabella (prima di `?v=`); con quello chiedi all'API:
+1. Sul portale sviluppatori di Notion, [app.notion.com/developers/connections](https://app.notion.com/developers/connections), crea una **connessione interna** (Notion le chiamava «integrazioni») per il tuo spazio di lavoro; serve essere proprietari dello spazio. Capacità: *Read content*, *Update content*, *Insert comments* e, se vuoi essere menzionato nei commenti, *User information without email addresses*. Il token è nella scheda **Configuration** (comincia con `ntn_`): va in `NOTION_TOKEN`.
+2. Apri la tabella Contenuti in Notion, menu `•••` in alto a destra, **Connessioni** (o *Aggiungi connessioni*), cerca la connessione e aggiungila. Finché non è collegata, l'API risponde con un errore.
+3. Prendi l'**id del data source**, che non è l'id della tabella. Dallo stesso menu `•••` della tabella: **Gestisci origini dati** (*Manage data sources*), poi *Copia ID origine dati*. In alternativa dall'API: l'id della tabella è la sequenza di 32 caratteri nel link della tabella (prima di `?v=`), e con quello:
 
 ```bash
 curl -s https://api.notion.com/v1/databases/<id-tabella> -H "Authorization: Bearer $NOTION_TOKEN" -H "Notion-Version: 2025-09-03" | python3 -c 'import json,sys; print(json.load(sys.stdin)["data_sources"][0]["id"])'
 ```
 
-   Il risultato va in `NOTION_DATA_SOURCE_ID`.
+   Il risultato va in `NOTION_DATA_SOURCE_ID`. (Dal 2025 una tabella Notion può avere più origini dati: il sistema legge la prima.)
 4. Facoltativo, per la menzione nei commenti: il tuo id utente da `curl -s https://api.notion.com/v1/users -H "Authorization: Bearer $NOTION_TOKEN" -H "Notion-Version: 2025-09-03"` (cerca il tuo nome nella risposta, campo `id`). Va in `NOTION_UTENTE_ID`. Senza, i commenti arrivano lo stesso, senza menzione.
 
 ### 3. La cartella Drive e l'account di servizio
 
 1. Su Google Drive crea una **cartella madre** (per esempio «Post da pubblicare»): dentro ci andrà una sottocartella per post.
 2. Su [console.cloud.google.com](https://console.cloud.google.com) crea un progetto, poi **API e servizi > Libreria**: abilita *Google Drive API*.
-3. **IAM e amministrazione > Account di servizio > Crea**: un nome qualsiasi, nessun ruolo. Apri l'account creato, scheda **Chiavi > Aggiungi chiave > Crea nuova chiave > JSON**: scarica il file.
+3. **IAM e amministrazione > Account di servizio > Crea account di servizio**: un nome qualsiasi, nessun ruolo. Apri l'account creato, scheda **Chiavi > Aggiungi chiave > Crea nuova chiave > JSON**: il file si scarica una volta sola. Se il pulsante è bloccato da un criterio dell'organizzazione (succede negli account Google Workspace aziendali creati dopo maggio 2024, non in un account Gmail), un amministratore deve esentare il progetto, oppure usa un progetto di un account personale.
 4. Metti il file in `GOOGLE_SA_KEY_B64` su una riga sola:
 
 ```bash
@@ -75,11 +75,11 @@ base64 -i chiave.json | tr -d '\n'
 ```
 
    (su Linux `base64 -w0 chiave.json`). Poi cancella il file scaricato.
-5. Torna su Drive: condividi la cartella madre con l'indirizzo email dell'account di servizio (lo trovi nel JSON, campo `client_email`, finisce con `.iam.gserviceaccount.com`) come **Editor**. Non Visualizzatore: il sistema deve poter cambiare i permessi dei singoli file. Le sottocartelle ereditano il permesso.
+5. Torna su Drive: condividi la cartella madre con l'indirizzo email dell'account di servizio (lo trovi nel JSON, campo `client_email`, finisce con `.iam.gserviceaccount.com`) come **Editor**. Non Visualizzatore: il sistema deve poter cambiare i permessi dei singoli file. Le sottocartelle ereditano il permesso. Una chiave appena creata può impiegare un minuto a diventare valida.
 
 ### 4. L'app Meta e il token della Pagina
 
-1. Su [developers.facebook.com/apps](https://developers.facebook.com/apps) crea un'app. Casi d'uso: *Gestisci tutto sulla tua Pagina* e *Gestisci messaggi e contenuti su Instagram*. L'app può restare in **modalità sviluppo**: pubblica sulle Pagine e sugli account di chi è amministratore dell'app, cioè tu, senza App Review.
+1. Su [developers.facebook.com/apps](https://developers.facebook.com/apps) crea un'app. Casi d'uso: *Manage everything on your Page* e *Manage messaging & content on Instagram* (nel pannello in italiano: gestire la Pagina e i contenuti di Instagram); in alternativa un'app di tipo Business con il prodotto *Facebook Login*. L'app può restare in **modalità sviluppo**: per chi ha un ruolo nell'app (amministratore, sviluppatore, tester) i permessi valgono senza App Review, ed è così che questo sistema pubblica. App Review serve solo se altre persone devono autorizzare la tua app.
 2. **Impostazioni dell'app > Di base**: copia *ID app* in `META_APP_ID` e *Chiave segreta* in `META_APP_SECRET`.
 3. Apri il [Graph API Explorer](https://developers.facebook.com/tools/explorer), scegli la tua app e aggiungi i permessi `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`, `business_management`. *Genera token di accesso*: nel consenso autorizza **solo** la Pagina e l'account Instagram che useranno il sistema.
 4. Il token appena generato dura un'ora. Allungalo a 60 giorni e poi prendi il token della Pagina, che non scade:
@@ -96,7 +96,7 @@ curl -s "https://graph.facebook.com/v26.0/me/accounts?access_token=<token-a-60-g
 curl -s "https://graph.facebook.com/v26.0/$META_PAGE_ID?fields=instagram_business_account&access_token=$META_PAGE_TOKEN"
 ```
 
-   Il valore di `instagram_business_account.id` va in `META_IG_USER_ID`. Se la risposta non ha quel campo, l'account Instagram non è professionale o non è collegato alla Pagina: si sistema nelle impostazioni della Pagina, *Account collegati*.
+   Il valore di `instagram_business_account.id` va in `META_IG_USER_ID`. Se la risposta non ha quel campo, l'account Instagram non è professionale o non è collegato alla Pagina: si sistema nelle impostazioni della Pagina, *Account collegati*. Se la Pagina richiede la *Page Publishing Authorization* (Meta lo chiede ad alcune Pagine con molti follower), va completata dal pannello della Pagina prima che l'API possa pubblicare.
 
 Il token della Pagina non scade, ma Meta fissa una scadenza all'**accesso ai dati** (circa 90 giorni dal consenso): `avvisi.py` controlla ogni mattina e avvisa 14 giorni prima; si rinnova rifacendo i punti 3 e 4.
 
@@ -108,7 +108,7 @@ Il token della Pagina non scade, ma Meta fissa una scadenza all'**accesso ai dat
 
 ### 5. Il repository e i segreti
 
-1. Su GitHub, **Use this template > Create a new repository**. Scegli **privato**: i registri dei lavori di GitHub stampano titoli e date dei post, cioè il calendario non ancora uscito. Un repository privato ha 2.000 minuti gratuiti al mese e il sistema ne usa circa 1.300-1.500.
+1. Su GitHub, **Use this template > Create a new repository**. Scegli **privato**, per due motivi: i registri dei lavori di GitHub stampano titoli e date dei post, cioè il calendario non ancora uscito; e in un repository pubblico GitHub spegne i lavori programmati dopo 60 giorni senza commit. Un repository privato ha 2.000 minuti gratuiti al mese e il sistema ne usa circa 1.300-1.500. Il repository nuovo parte da un solo commit, senza la storia del template.
 2. Clona il repository sul computer, copia `.env.example` in `.env` e compila le righe dei passi 2, 3 e 4. Il file resta sul computer (è in `.gitignore`).
 3. Controlla che tutto sia a posto, senza toccare niente in rete:
 
@@ -145,7 +145,7 @@ Il cron di GitHub Actions da solo non è puntuale e può saltare giri interi. L'
      | `Content-Type` | `application/json` |
 
    - *Request body*: `{"ref":"main"}` (il nome del ramo principale del tuo repository).
-3. Salva e usa **Test run**: GitHub risponde `204 No Content` e nella scheda Actions compare un giro di *Pubblica* avviato da `workflow_dispatch`. Un altro codice vuol dire token sbagliato (401), permessi insufficienti (403) o ramo o nome del workflow sbagliato (404 o 422).
+3. Salva e lancia una prova dal pannello (**Test run**): GitHub risponde `204 No Content` (o `200` con l'id del giro, nelle versioni più recenti dell'API) e nella scheda Actions compare un giro di *Pubblica* avviato da `workflow_dispatch`. Un altro codice vuol dire token sbagliato (401), permessi insufficienti (403) o ramo o nome del workflow sbagliato (404 o 422).
 
 Il token a grana fine ha una scadenza (al massimo un anno): segnati di rinnovarlo.
 
@@ -228,3 +228,5 @@ Anche l'integrazione Notion (passo 2, punti 1 e 2) la crea la persona nel suo sp
 - **L'intestazione `X-GitHub-Api-Version: 2022-11-28`** di cron-job.org: GitHub la sostiene almeno fino a marzo 2028, poi va aggiornata.
 
 Il codice è in italiano, nomi e commenti compresi, perché è pensato per essere letto da chi lo installa. Notion usa la versione `2025-09-03` dell'API, Meta la `v26.0`. Licenza MIT (file `LICENSE`).
+
+I comandi e i nomi delle API in questa guida sono controllati sulla documentazione ufficiale di Notion, Google, Meta, LinkedIn e GitHub (ottobre 2026) e il sistema gira così in produzione da ottobre 2026. I nomi delle voci di menu dei pannelli possono cambiare: se un passo non torna, apri una issue con quello che vedi.
